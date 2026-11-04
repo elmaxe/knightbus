@@ -56,6 +56,56 @@ public class OrderPlacedMapping : IMessageMapping<OrderPlaced>
 
 Queues, topics and subscriptions are created automatically the first time they are needed.
 
+## Subscriptions forward to a queue of their own
+
+Each subscription forwards its messages to a queue named `{topic}.{subscription}`, and KnightBus
+processes the subscription's messages from that queue. For the mapping above and a subscription named
+`billing`, events arrive in the subscription `order-placed/billing` and are processed from the queue
+`order-placed.billing`.
+
+The point is dead letters. A message the handler gives up on is dead-lettered on the queue, and moving
+it back puts it on that queue, so only the subscription that failed it handles it again. Without the
+queue the only way back into a subscription is to publish to the topic again, which delivers the
+message to every subscription — including the ones that already handled it.
+
+The topic, the queue and the subscription are created together. A subscription that already exists,
+for example one created by an earlier version of KnightBus, is pointed at its queue when the queue is
+first created, so upgrading needs no manual step:
+
+- Messages waiting on the subscription and new events are forwarded to the queue from then on. Dead
+  letters already on the subscription stay there; moving them with the
+  [management API](#dead-letters) sends them to the queue rather than to the topic.
+- Service Bus does not let anything receive from a subscription that forwards. During a rolling
+  upgrade, instances still on an older version stop receiving once the first upgraded instance
+  switches the subscription, and the upgraded instances take over from the queue.
+- Rolling back to an older version leaves the subscription forwarding, and the older version cannot
+  receive from it. Remove `ForwardTo` from the subscription when you roll back.
+- The queue is created with the queue defaults, like a command's queue: a `MaxDeliveryCount` of 10
+  and a lock duration of one minute. Keep
+  [`DeadLetterDeliveryLimit`](#processing-settings) below the queue's `MaxDeliveryCount`.
+
+To keep receiving from the subscription itself, turn forwarding off for every topic, or for one
+topic through its mapping's [creation options](#entity-creation-options):
+
+```csharp
+services.UseServiceBus(config =>
+{
+    config.ConnectionString = connectionString;
+    config.DefaultCreationOptions.ForwardSubscriptionsToQueue = false;
+});
+```
+
+Turning it off does not change a subscription that already forwards. Remove `ForwardTo` from the
+subscription yourself, or the receiver waits on a subscription that never holds a message.
+
+!!! note "Declaring entities up front"
+    If your entities are declared rather than created by KnightBus — with infrastructure as code, or
+    on the emulator, which KnightBus cannot create entities on — declare the queue
+    `{topic}.{subscription}` and set the subscription's `ForwardTo` to it.
+    `SubscriptionForwarding.QueueName(topic, subscription)` returns the name. The
+    [Aspire host sample](https://github.com/BookBeat/knightbus/tree/master/samples/KnightBus.Samples.Azure.AspireHost)
+    does this for the emulator.
+
 ## Client
 
 ```csharp
@@ -106,21 +156,26 @@ public class OrderPlacedMapping : IMessageMapping<OrderPlaced>, IServiceBusCreat
     public bool EnablePartitioning => true;
     public bool SupportOrdering => false;
     public bool EnableBatchedOperations => true;
+    public bool ForwardSubscriptionsToQueue => true;
 }
 ```
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `EnablePartitioning` | `false` | Creates the entity as partitioned, for higher throughput. |
+| `EnablePartitioning` | `false` | Creates the entity as partitioned, for higher throughput. Also applies to a subscription's forwarding queue. |
 | `SupportOrdering` | `false` | Messages are forwarded to subscriptions in order. |
 | `EnableBatchedOperations` | `true` | Server-side batching. |
+| `ForwardSubscriptionsToQueue` | `true` | Forwards each subscription of the topic to a [queue of its own](#subscriptions-forward-to-a-queue-of-their-own). |
 
 Two caveats:
 
-- **It is all or nothing.** A mapping that implements the interface supplies all three values; there
-  is no per-property merge with the defaults.
+- **It is all or nothing.** A mapping that implements the interface supplies all of the values; there
+  is no per-property merge with the defaults. `ForwardSubscriptionsToQueue` has a default
+  implementation of `true` on the interface, so a mapping that does not declare it forwards even when
+  `DefaultCreationOptions` turns forwarding off.
 - **It only applies at creation.** Changing these values does not reconfigure an entity that already
-  exists — Azure requires most of them to be set when the entity is created.
+  exists — Azure requires most of them to be set when the entity is created. The exception is
+  `ForwardSubscriptionsToQueue`, which also points an existing subscription at its new queue.
 
 To change the defaults for every message instead, adjust `DefaultCreationOptions` on the
 configuration:
@@ -165,6 +220,17 @@ with the [management API](../features/management.md):
 ```csharp
 services.AddServiceBusManagement(connectionString);
 ```
+
+An event's dead letters are on its subscription's forwarding queue, `{topic}.{subscription}`, which
+the queue manager lists with the other queues. `MoveDeadLetters` on that queue redelivers them to that
+subscription only. On the subscription manager:
+
+- `MoveDeadLetters` moves the subscription's own dead letters to the entity it forwards to, and to the
+  topic only when it does not forward.
+- `Delete` also deletes the subscription's forwarding queue, with the messages on it. Otherwise a
+  receiver would keep waiting on the queue and never create the subscription again.
+- `Peek` and `Receive` throw on a subscription that forwards, since Service Bus does not let anything
+  receive from it. Peek its queue instead.
 
 This is also the only transport supporting `PeekScheduled` (inspecting deferred messages before
 delivery) and `CancelScheduledMessage` through the management API.

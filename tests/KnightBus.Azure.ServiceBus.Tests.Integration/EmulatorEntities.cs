@@ -26,6 +26,20 @@ internal static class EmulatorEntities
         );
     }
 
+    // Empties the queue a subscription forwards to. Service Bus refuses a receiver on a subscription
+    // that forwards, only its dead letters can still be read
+    public static async Task PurgeForwardedSubscription(
+        ServiceBusClient client,
+        string topic,
+        string subscription
+    )
+    {
+        await Drain(
+            client.CreateReceiver(topic, subscription, ReceiveAndDelete(SubQueue.DeadLetter))
+        );
+        await PurgeQueue(client, SubscriptionForwarding.QueueName(topic, subscription));
+    }
+
     public static async Task<IReadOnlyList<ServiceBusReceivedMessage>> Receive(
         ServiceBusReceiver receiver,
         int count,

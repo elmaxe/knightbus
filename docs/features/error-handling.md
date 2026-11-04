@@ -98,7 +98,7 @@ The destination is transport-specific:
 
 | Transport | Dead letter location |
 | --- | --- |
-| Azure Service Bus | The queue's or subscription's built-in dead letter sub-queue. |
+| Azure Service Bus | The queue's built-in dead letter sub-queue. For an event, that is the queue its subscription [forwards to](../transports/azure-service-bus.md#subscriptions-forward-to-a-queue-of-their-own). |
 | Azure Storage Queues | A separate queue named `{queue}-dl`. |
 | PostgreSQL | Table `knightbus.dlq_{queue}` (or `dlq_{topic}_{subscription}`). |
 | Redis | The list `{queue}:deadletter`. |

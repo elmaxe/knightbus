@@ -7,10 +7,15 @@ var serviceBus = builder.AddAzureServiceBus("servicebus").RunAsEmulator();
 serviceBus.AddServiceBusQueue("your-queue");
 serviceBus.AddServiceBusQueue("other-queue");
 
-// Add topic with subscriptions
+// Add topic with subscriptions. KnightBus forwards each subscription to a queue of its own and
+// receives from that queue, and the emulator cannot create them at runtime, so both are declared
 var topic = serviceBus.AddServiceBusTopic("your-topic");
-topic.AddServiceBusSubscription("subscription-1");
-topic.AddServiceBusSubscription("subscription-2");
+foreach (var subscription in new[] { "subscription-1", "subscription-2" })
+{
+    var queueName = $"your-topic.{subscription}";
+    serviceBus.AddServiceBusQueue($"{subscription}-queue", queueName);
+    topic.AddServiceBusSubscription(subscription).WithProperties(s => s.ForwardTo = queueName);
+}
 
 // Add the consumer (KnightBus host) - waits for Service Bus to be ready
 builder

@@ -1,5 +1,36 @@
 # CHANGELOG
 
+# 2026-11-04
+
+### Service Bus subscriptions forward to a queue of their own
+Moving a subscription's dead letters back published them to the topic again, so every subscription of
+the topic received them, including the ones that had already handled them. Each subscription now
+forwards to a queue named `{topic}.{subscription}` and is processed from that queue. Dead letters land
+on the queue, and moving them back reaches only that subscription. See
+[Subscriptions forward to a queue of their own](https://bookbeat.github.io/knightbus/transports/azure-service-bus/#subscriptions-forward-to-a-queue-of-their-own).
+
+### KnightBus.Azure.ServiceBus 26.0.0
+* **Breaking:** subscriptions forward to a queue of their own by default, and their messages are
+  received from that queue. The queue is created with the topic and the subscription, and an
+  existing subscription is pointed at it, so its waiting messages move over without a manual step.
+  Service Bus does not let anything receive from a subscription that forwards, so instances on an
+  older version stop receiving the subscription once it is switched, and rolling back needs
+  `ForwardTo` removed from the subscription. Entities declared up front, for example on the emulator,
+  need the queue declared and the subscription's `ForwardTo` set
+* Added `ForwardSubscriptionsToQueue` to `IServiceBusCreationOptions`, with a default implementation
+  of `true`, and to `ServiceBusCreationOptions`. Set it to `false` to keep receiving from the
+  subscription itself
+* Added `SubscriptionForwarding`, which names the queue and reads the entity name from a `ForwardTo`
+  address
+* `IClientFactory.GetReceiverClient<TTopic, TSubscription>` returns a processor for the forwarding
+  queue when forwarding is enabled
+### KnightBus.Azure.ServiceBus.Management 6.0.0
+* Depends on `KnightBus.Azure.ServiceBus` 26.0.0
+* `ServiceBusSubscriptionManager.MoveDeadLetters` moves dead letters to the entity the subscription
+  forwards to, and to the topic only when it does not forward. It disposes the receiver and sender it
+  creates, which it previously left open
+* `ServiceBusSubscriptionManager.Delete` also deletes the subscription's forwarding queue
+
 # 2026-10-30
 
 ### New Relic transactions carry their queue, topic and subscription

@@ -156,12 +156,6 @@ internal abstract class ServiceBusChannelReceiverBase<T> : IChannelReceiver
         }
     }
 
-    protected IServiceBusCreationOptions GetServiceBusCreationOptions()
-    {
-        var queueMapping = AutoMessageMapper.GetMapping<T>();
-        // ReSharper disable once SuspiciousTypeConversion.Global
-        var creationOptions = queueMapping as IServiceBusCreationOptions;
-
-        return creationOptions ?? _configuration.DefaultCreationOptions;
-    }
+    protected IServiceBusCreationOptions GetServiceBusCreationOptions() =>
+        ServiceBusEntities.GetCreationOptions<T>(_configuration);
 }

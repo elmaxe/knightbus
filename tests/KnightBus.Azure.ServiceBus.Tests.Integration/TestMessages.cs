@@ -3,7 +3,8 @@ using KnightBus.Messages;
 
 namespace KnightBus.Azure.ServiceBus.Tests.Integration;
 
-// Queue and topic names must match the entities declared in Config.json
+// Queue and topic names must match the entities declared in Config.json, as must the queues
+// that subscriptions forward to
 
 public class StateHandlerCommand : IServiceBusCommand
 {
@@ -101,4 +102,37 @@ public class DrainEventMapping : IMessageMapping<DrainEvent>
 public class DrainEventSubscription : IEventSubscription<DrainEvent>
 {
     public string Name => "drain-sub";
+}
+
+public class ForwardingEvent : IServiceBusEvent
+{
+    public string? Message { get; set; }
+}
+
+public class ForwardingEventMapping : IMessageMapping<ForwardingEvent>
+{
+    public string QueueName => "forwarding-events";
+}
+
+public class ForwardingEventSubscriptionA : IEventSubscription<ForwardingEvent>
+{
+    public string Name => "forwarding-a";
+}
+
+public class NotForwardingEventMapping
+    : IMessageMapping<NotForwardingEvent>,
+        IServiceBusCreationOptions
+{
+    public string QueueName => "not-forwarding-events";
+    public bool EnablePartitioning => false;
+    public bool SupportOrdering => false;
+    public bool EnableBatchedOperations => true;
+    public bool ForwardSubscriptionsToQueue => false;
+}
+
+public class NotForwardingEvent : IServiceBusEvent { }
+
+public class NotForwardingEventSubscription : IEventSubscription<NotForwardingEvent>
+{
+    public string Name => "not-forwarding-sub";
 }

@@ -20,4 +20,12 @@ public interface IServiceBusCreationOptions
     /// </summary>
     /// <remarks>Overrides default value (true) from ServiceBusCreationOptions</remarks>
     bool EnableBatchedOperations { get; }
+
+    /// <summary>
+    /// Forwards each subscription of the topic to a queue of its own and processes the messages
+    /// from that queue, so that dead letters land in the queue and moving them back reaches only
+    /// that subscription instead of being published to the topic again.
+    /// </summary>
+    /// <remarks>Overrides default value (true) from ServiceBusCreationOptions</remarks>
+    bool ForwardSubscriptionsToQueue => true;
 }

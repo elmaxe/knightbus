@@ -34,7 +34,7 @@ public class ServiceBusHostTests
         FailingHostProcessor.Reset();
         await EmulatorEntities.PurgeQueue(_client, CommandQueue);
         await EmulatorEntities.PurgeQueue(_client, FailingQueue);
-        await EmulatorEntities.PurgeSubscription(_client, Topic, Subscription);
+        await EmulatorEntities.PurgeForwardedSubscription(_client, Topic, Subscription);
     }
 
     // A host left running would keep consuming from the entities the next test uses
@@ -69,10 +69,9 @@ public class ServiceBusHostTests
         var processed = await HostProcessor.Events.Task.WaitAsync(TimeSpan.FromSeconds(15));
         await StopHost();
 
-        //assert
+        //assert: the subscription forwards to its queue, which is where the host received it from
         processed.Message.Should().Be("event");
-        await using var receiver = _client.CreateReceiver(Topic, Subscription);
-        (await receiver.PeekMessagesAsync(10)).Should().BeEmpty();
+        (await PeekQueue(SubscriptionForwarding.QueueName(Topic, Subscription))).Should().BeEmpty();
     }
 
     [Test]

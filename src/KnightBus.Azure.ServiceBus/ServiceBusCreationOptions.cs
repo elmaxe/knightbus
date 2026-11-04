@@ -20,4 +20,12 @@ public class ServiceBusCreationOptions : IServiceBusCreationOptions
     /// </summary>
     /// <remarks>Defaults to true.</remarks>
     public bool EnableBatchedOperations { get; set; } = true;
+
+    /// <summary>
+    /// Forwards each subscription of the topic to a queue of its own and processes the messages
+    /// from that queue, so that dead letters land in the queue and moving them back reaches only
+    /// that subscription instead of being published to the topic again.
+    /// </summary>
+    /// <remarks>Defaults to true. The queue is named by <see cref="SubscriptionForwarding.QueueName"/>.</remarks>
+    public bool ForwardSubscriptionsToQueue { get; set; } = true;
 }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -45,9 +46,37 @@ public class ServiceBusSubscriptionManager : IQueueManager
         return sub.Value.ToQueueProperties(this, _topic);
     }
 
-    public Task Delete(string path, CancellationToken ct)
+    /// <summary>
+    /// Deletes the subscription, and the queue it forwards to when that is the queue KnightBus
+    /// created for it. A receiver left with only the queue would wait on it and never recreate the
+    /// subscription.
+    /// </summary>
+    public async Task Delete(string path, CancellationToken ct)
     {
-        return _adminClient.DeleteSubscriptionAsync(_topic, path, ct);
+        SubscriptionProperties subscription = await _adminClient
+            .GetSubscriptionAsync(_topic, path, ct)
+            .ConfigureAwait(false);
+        await _adminClient.DeleteSubscriptionAsync(_topic, path, ct).ConfigureAwait(false);
+
+        var forwardingQueue = SubscriptionForwarding.QueueName(_topic, path);
+        if (
+            !string.Equals(
+                SubscriptionForwarding.EntityName(subscription.ForwardTo),
+                forwardingQueue,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+            return;
+
+        try
+        {
+            await _adminClient.DeleteQueueAsync(forwardingQueue, ct).ConfigureAwait(false);
+        }
+        catch (ServiceBusException e)
+            when (e.Reason == ServiceBusFailureReason.MessagingEntityNotFound)
+        {
+            //Already gone
+        }
     }
 
     public async Task<IReadOnlyList<QueueMessage>> Peek(
@@ -145,16 +174,32 @@ public class ServiceBusSubscriptionManager : IQueueManager
             .ConfigureAwait(false);
     }
 
-    public Task<int> MoveDeadLetters(string path, int count, CancellationToken ct)
+    /// <summary>
+    /// Moves the subscription's dead letters to the entity it forwards to, so that only this
+    /// subscription sees them again. A subscription that does not forward gets them back through the
+    /// topic, which delivers them to every subscription of the topic.
+    /// </summary>
+    /// <remarks>
+    /// Messages dead-lettered by a receiver of a forwarding subscription are in the dead letter queue
+    /// of the queue it forwards to, and are moved with <see cref="ServiceBusQueueManager"/>.
+    /// </remarks>
+    public async Task<int> MoveDeadLetters(string path, int count, CancellationToken ct)
     {
-        var receiver = _client.CreateReceiver(
+        SubscriptionProperties subscription = await _adminClient
+            .GetSubscriptionAsync(_topic, path, ct)
+            .ConfigureAwait(false);
+        var destination = SubscriptionForwarding.EntityName(subscription.ForwardTo) ?? _topic;
+
+        await using var receiver = _client.CreateReceiver(
             _topic,
             path,
             new ServiceBusReceiverOptions { SubQueue = SubQueue.DeadLetter }
         );
-        var sender = _client.CreateSender(_topic);
+        await using var sender = _client.CreateSender(destination);
 
-        return ServiceBusQueueManager.MoveMessages(sender, receiver, count, 10);
+        return await ServiceBusQueueManager
+            .MoveMessages(sender, receiver, count, 10)
+            .ConfigureAwait(false);
     }
 
     public QueueType QueueType => QueueType.Subscription;

@@ -44,7 +44,7 @@ public class ServiceBusDrainTests
     {
         await EmulatorEntities.PurgeQueue(_client, CommandQueue);
         await EmulatorEntities.PurgeQueue(_client, LockQueue);
-        await EmulatorEntities.PurgeSubscription(_client, Topic, Subscription);
+        await EmulatorEntities.PurgeForwardedSubscription(_client, Topic, Subscription);
         //The host only supplies the dependency injection and the client factory, the receiver
         //under test is started by hand so the test controls when it drains
         _host = new HostBuilder()

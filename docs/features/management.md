@@ -201,3 +201,7 @@ concrete `Dictionary<string, string>`, hence the copy.
 
 Topic managers are metadata-only: `List` and `Get` enumerate subscriptions, and the message
 operations throw. Operate on the subscription managers instead. NATS has no management support at all.
+
+On Service Bus a subscription forwards to a queue of its own by default, and that queue holds the
+subscription's messages and dead letters. See
+[subscriptions forward to a queue of their own](../transports/azure-service-bus.md#subscriptions-forward-to-a-queue-of-their-own).

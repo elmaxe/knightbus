@@ -14,6 +14,12 @@ public interface IClientFactory : IAsyncDisposable
         where T : IMessage;
     Task<ServiceBusProcessor> GetReceiverClient<T>(ServiceBusProcessorOptions options)
         where T : ICommand;
+
+    /// <summary>
+    /// The processor that receives the subscription's messages: from the subscription's forwarding
+    /// queue when <see cref="IServiceBusCreationOptions.ForwardSubscriptionsToQueue"/> is enabled
+    /// for the topic, otherwise from the subscription itself.
+    /// </summary>
     Task<ServiceBusProcessor> GetReceiverClient<TTopic, TSubscription>(
         TSubscription subscription,
         ServiceBusProcessorOptions options
@@ -24,6 +30,7 @@ public interface IClientFactory : IAsyncDisposable
 
 public class ClientFactory : IClientFactory
 {
+    private readonly IServiceBusConfiguration _configuration;
     private readonly ServiceBusClient _serviceBusClient;
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1);
     private ConcurrentDictionary<Type, ServiceBusSender> SenderClients { get; } =
@@ -34,6 +41,7 @@ public class ClientFactory : IClientFactory
 
     public ClientFactory(IServiceBusConfiguration configuration)
     {
+        _configuration = configuration;
         _serviceBusClient = ServiceBusClientFactory.CreateServiceBusClient(configuration);
     }
 
@@ -87,9 +95,18 @@ public class ClientFactory : IClientFactory
         where TSubscription : IEventSubscription<TTopic>
     {
         var topicName = AutoMessageMapper.GetQueueName<TTopic>();
-        return Task.FromResult(
-            _serviceBusClient.CreateProcessor(topicName, subscription.Name, options)
-        );
+        if (
+            !ServiceBusEntities
+                .GetCreationOptions<TTopic>(_configuration)
+                .ForwardSubscriptionsToQueue
+        )
+            return Task.FromResult(
+                _serviceBusClient.CreateProcessor(topicName, subscription.Name, options)
+            );
+
+        //The subscription forwards everything to its own queue, so that is where it is received
+        var queueName = SubscriptionForwarding.QueueName(topicName, subscription.Name);
+        return Task.FromResult(_serviceBusClient.CreateProcessor(queueName, options));
     }
 
     public async ValueTask DisposeAsync()
