@@ -157,6 +157,53 @@ dead-letters the message before KnightBus does and the
 [`IProcessBeforeDeadLetter<T>`](../features/error-handling.md#hooking-into-dead-lettering) hook never
 runs.
 
+## Retrying with a delay
+
+A failed message is abandoned and Service Bus delivers it again right away: it has no way to abandon a
+message with a delay. To wait between attempts, implement `IServiceBusRetryDelay` on the processing
+settings. It is given the number of deliveries so far, the failed one included, so it can back off:
+
+```csharp
+public class BackoffSettings : IProcessingSettings, IServiceBusRetryDelay
+{
+    public int MaxConcurrentCalls => 10;
+    public int PrefetchCount => 10;
+    public TimeSpan MessageLockTimeout => TimeSpan.FromMinutes(5);
+    public int DeadLetterDeliveryLimit => 5;
+
+    // 10s, 20s, 40s, 80s
+    public TimeSpan GetRetryDelay(int deliveryCount) =>
+        TimeSpan.FromSeconds(10 * Math.Pow(2, deliveryCount - 1));
+}
+```
+
+KnightBus schedules a copy of the failed message that far into the future and completes the
+original. If the original cannot be completed, the copy is cancelled again and the original is
+redelivered as usual; if the copy cannot be scheduled, the message is abandoned without a delay.
+
+| On the copy | Why |
+| --- | --- |
+| `KnightBus.PreviousDeliveryCount` | Service Bus counts the deliveries of the copy from zero. KnightBus adds this to it, so `DeliveryCount` and `DeadLetterDeliveryLimit` count every attempt. |
+| A new `MessageId` | So [duplicate detection](https://learn.microsoft.com/azure/service-bus-messaging/duplicate-detection) does not drop it. |
+| `KnightBus.OriginalMessageId` | The id of the message as it was first sent. |
+| `ErrorMessage`, `Exception` | The error of the latest attempt, as on an abandoned message. |
+
+Some things to know:
+
+- **Commands only.** A message cannot be sent to a single subscription, so failed events are
+  redelivered right away; a warning is logged when an event's settings implement the interface.
+- **Return `TimeSpan.Zero`** to redeliver right away.
+- **No delay before dead-lettering.** The attempt that reaches `DeadLetterDeliveryLimit` is
+  abandoned right away, since the next delivery only dead-letters it. Nor is there a delay when
+  processing was cancelled, by a shutdown or a lost lock, rather than failed.
+- **The queue's `MaxDeliveryCount` stops counting**, because every copy starts from zero, so
+  `DeadLetterDeliveryLimit` is what limits the attempts.
+- **A retry costs more than an abandon**: a scheduled send and a completion instead of one
+  operation.
+- **`MoveDeadLetters` resets the count.** The [management API](../features/management.md) drops
+  `KnightBus.PreviousDeliveryCount` when it requeues dead letters, so they get every attempt again.
+  Tools that resend a dead letter with its properties keep it; remove it there before resending.
+
 ## Dead letters
 
 Service Bus provides a dead letter sub-queue per queue and per subscription. Read and requeue them

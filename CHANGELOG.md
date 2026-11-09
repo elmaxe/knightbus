@@ -1,5 +1,21 @@
 # CHANGELOG
 
+# 2026-11-09
+
+### Retry Service Bus commands with a delay
+A failed Service Bus message was abandoned and delivered again right away, since Service Bus has no
+way to abandon with a delay. Processing settings that implement `IServiceBusRetryDelay` now decide how
+long to wait before each retry, for example to back off exponentially. The failed message is
+scheduled again as a copy and the original completed, and the copy remembers the deliveries before it
+so the dead letter limit still applies. Only commands are retried this way: a subscription cannot be
+sent to on its own, so failed events are still redelivered right away.
+
+### KnightBus.Azure.ServiceBus 25.1.0
+* Added `IServiceBusRetryDelay` and `ServiceBusMessageProperties`
+### KnightBus.Azure.ServiceBus.Management 5.0.1
+* `MoveDeadLetters` drops the delivery count a delayed retry left on a message, so a requeued message
+  gets all its attempts again instead of being dead-lettered unprocessed
+
 # 2026-10-30
 
 ### New Relic transactions carry their queue, topic and subscription

@@ -18,6 +18,8 @@ internal abstract class ServiceBusChannelReceiverBase<T> : IChannelReceiver
     private readonly IMessageSerializer _serializer;
     protected readonly ILogger Log;
     private int _deadLetterLimit;
+    private readonly IServiceBusRetryDelay? _retryDelay;
+    private ServiceBusDelayedRetry? _delayedRetry;
 
     protected readonly IClientFactory ClientFactory;
     protected readonly ServiceBusAdministrationClient ManagementClient;
@@ -35,6 +37,8 @@ internal abstract class ServiceBusChannelReceiverBase<T> : IChannelReceiver
         _hostConfiguration = hostConfiguration;
         _processor = processor;
         Settings = settings;
+        //Read here, a singleton receiver replaces Settings with its own before it starts
+        _retryDelay = settings as IServiceBusRetryDelay;
         Log = hostConfiguration.Log;
         ClientFactory = _hostConfiguration.DependencyInjection.GetInstance<IClientFactory>();
         ManagementClient = ServiceBusClientFactory.CreateServiceBusAdministrationClient(
@@ -50,6 +54,7 @@ internal abstract class ServiceBusChannelReceiverBase<T> : IChannelReceiver
     )
     {
         _deadLetterLimit = Settings.DeadLetterDeliveryLimit;
+        _delayedRetry = await CreateDelayedRetry().ConfigureAwait(false);
 
         //The receiver is started again whenever its singleton lock comes back, so the callbacks of
         //one start only ever use that start's client and token, never those of a later one
@@ -86,6 +91,29 @@ internal abstract class ServiceBusChannelReceiverBase<T> : IChannelReceiver
         {
             //Swallow
         }
+    }
+
+    /// <summary>
+    /// Whether a failed message can be scheduled again on the entity it was received from, which
+    /// is possible for a queue but not for a subscription
+    /// </summary>
+    protected abstract bool CanRetryWithDelay { get; }
+
+    private async Task<ServiceBusDelayedRetry?> CreateDelayedRetry()
+    {
+        if (_retryDelay is null)
+            return null;
+        if (!CanRetryWithDelay)
+        {
+            Log.LogWarning(
+                "{MessageType} is received from a subscription, which cannot retry with a delay. {Setting} is ignored and failed messages are redelivered right away",
+                typeof(T).Name,
+                nameof(IServiceBusRetryDelay)
+            );
+            return null;
+        }
+        var sender = await ClientFactory.GetSenderClient<T>().ConfigureAwait(false);
+        return new ServiceBusDelayedRetry(sender, _retryDelay, Log);
     }
 
     protected abstract Task<ServiceBusProcessor> CreateClient(CancellationToken cancellationToken);
@@ -142,7 +170,8 @@ internal abstract class ServiceBusChannelReceiverBase<T> : IChannelReceiver
                 arg,
                 _serializer,
                 _deadLetterLimit,
-                _hostConfiguration.DependencyInjection
+                _hostConfiguration.DependencyInjection,
+                _delayedRetry
             );
             await _processor.ProcessAsync(stateHandler, cts.Token).ConfigureAwait(false);
         }

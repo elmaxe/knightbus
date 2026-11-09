@@ -14,8 +14,10 @@ it stops blocking the queue.
    being handed to your handler again.
 
 There is no built-in delay or backoff between attempts — redelivery timing belongs to the transport.
-If you need backoff, either configure it on the transport or catch the error yourself and re-send the
-message with a delay using [deferred delivery](scheduling.md#deferred-messages).
+Azure Service Bus commands can wait between attempts with
+[`IServiceBusRetryDelay`](../transports/azure-service-bus.md#retrying-with-a-delay). Elsewhere, catch
+the error yourself and re-send the message with a delay using
+[deferred delivery](scheduling.md#deferred-messages).
 
 ## Dead-lettering
 

@@ -147,6 +147,42 @@ public class ServiceBusQueueManagerTests
     }
 
     [Test]
+    public async Task Should_reset_the_delivery_count_of_delayed_retries_when_moving_dead_letters()
+    {
+        //arrange
+        await using (var sender = _client.CreateSender(Queue))
+        await using (var receiver = _client.CreateReceiver(Queue))
+        {
+            await sender.SendMessageAsync(
+                new ServiceBusMessage("{\"n\":1}")
+                {
+                    ApplicationProperties =
+                    {
+                        [ServiceBusMessageProperties.PreviousDeliveryCount] = 3,
+                        [ServiceBusMessageProperties.OriginalMessageId] = "original",
+                    },
+                }
+            );
+            var message = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(5));
+            await receiver.DeadLetterMessageAsync(message);
+        }
+
+        //act
+        await _queueManager.MoveDeadLetters(Queue, 1, CancellationToken.None);
+
+        //assert
+        await using var peeker = _client.CreateReceiver(Queue);
+        var moved = await peeker.PeekMessagesAsync(10);
+        moved.Should().ContainSingle();
+        moved[0]
+            .ApplicationProperties.Should()
+            .NotContainKey(ServiceBusMessageProperties.PreviousDeliveryCount);
+        moved[0]
+            .ApplicationProperties.Should()
+            .Contain(ServiceBusMessageProperties.OriginalMessageId, "original");
+    }
+
+    [Test]
     public async Task Should_list_and_get_queues_through_the_administration_endpoint()
     {
         //arrange

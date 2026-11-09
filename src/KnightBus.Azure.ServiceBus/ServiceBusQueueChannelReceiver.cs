@@ -24,6 +24,8 @@ internal class ServiceBusQueueChannelReceiver<T> : ServiceBusChannelReceiverBase
     )
         : base(settings, serializer, configuration, hostConfiguration, processor) { }
 
+    protected override bool CanRetryWithDelay => true;
+
     protected override Task<ServiceBusProcessor> CreateClient(CancellationToken cancellationToken)
     {
         return ClientFactory.GetReceiverClient<T>(

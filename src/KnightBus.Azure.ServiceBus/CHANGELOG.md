@@ -1,5 +1,15 @@
 ﻿# KnightBus.Azure.ServiceBus Changelog
 
+## 25.1.0
+### Added
+- `IServiceBusRetryDelay`: implement it on the processing settings of a command to wait before a
+  failed message is delivered again. Service Bus cannot abandon a message with a delay, so the
+  message is scheduled again as a copy and the original is completed. The copy carries the earlier
+  deliveries in the `KnightBus.PreviousDeliveryCount` application property, so `DeliveryCount` and
+  `DeadLetterDeliveryLimit` count across the copies, and gets a new message id, with the first one in
+  `KnightBus.OriginalMessageId`
+- `ServiceBusMessageProperties` with the names of those properties
+
 ## 25.0.0
 ### Changed
 - Requires `KnightBus.Core` 19.0.0: the queue and topic receivers implement

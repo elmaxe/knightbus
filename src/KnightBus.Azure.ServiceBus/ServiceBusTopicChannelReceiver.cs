@@ -28,6 +28,8 @@ internal class ServiceBusTopicChannelReceiver<T>
         _subscription = subscription;
     }
 
+    protected override bool CanRetryWithDelay => false;
+
     protected override Task<ServiceBusProcessor> CreateClient(CancellationToken cancellationToken)
     {
         return ClientFactory.GetReceiverClient<T, IEventSubscription<T>>(

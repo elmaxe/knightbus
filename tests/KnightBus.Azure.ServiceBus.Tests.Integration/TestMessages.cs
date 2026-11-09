@@ -52,6 +52,13 @@ public class FailingHostCommandMapping : IMessageMapping<FailingHostCommand>
     public string QueueName => "host-failing";
 }
 
+public class RetryHostCommand : IServiceBusCommand { }
+
+public class RetryHostCommandMapping : IMessageMapping<RetryHostCommand>
+{
+    public string QueueName => "host-retry";
+}
+
 public class HostEvent : IServiceBusEvent
 {
     public string? Message { get; set; }

@@ -47,9 +47,13 @@ internal static class EmulatorEntities
     }
 
     // A message published to a topic reaches its subscriptions a moment later on the emulator
-    public static async Task<T> Eventually<T>(Func<Task<T>> read, Func<T, bool> done)
+    public static async Task<T> Eventually<T>(
+        Func<Task<T>> read,
+        Func<T, bool> done,
+        TimeSpan? timeout = null
+    )
     {
-        var deadline = DateTime.UtcNow.AddSeconds(10);
+        var deadline = DateTime.UtcNow.Add(timeout ?? TimeSpan.FromSeconds(10));
         var value = await read();
         while (!done(value) && DateTime.UtcNow < deadline)
         {

@@ -26,13 +26,12 @@ internal static class ServiceBusMessageExtensions
         Exception e
     )
     {
-        return client.AbandonMessageAsync(
-            message,
-            new Dictionary<string, object>
-            {
-                { "ErrorMessage", e.Message },
-                { "Exception", e.ToString() },
-            }
-        );
+        return client.AbandonMessageAsync(message, ErrorProperties(e));
     }
+
+    /// <summary>
+    /// The properties a failed message carries to its next delivery and to the dead letter queue
+    /// </summary>
+    public static Dictionary<string, object> ErrorProperties(Exception e) =>
+        new() { { "ErrorMessage", e.Message }, { "Exception", e.ToString() } };
 }

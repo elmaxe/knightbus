@@ -241,6 +241,15 @@ public class ServiceBusQueueManager : IQueueManager, IQueueMessageSender, IAsync
         await sender.CancelScheduledMessageAsync(sequenceNumber, cancellationToken);
     }
 
+    //A moved message starts over, so the deliveries counted by earlier delayed retries are dropped
+    //along with the broker's own count, or the message would be dead-lettered again unprocessed
+    private static ServiceBusMessage Clone(ServiceBusReceivedMessage message)
+    {
+        var clone = new ServiceBusMessage(message);
+        clone.ApplicationProperties.Remove(ServiceBusMessageProperties.PreviousDeliveryCount);
+        return clone;
+    }
+
     internal static async Task<int> MoveMessages(
         ServiceBusSender sender,
         ServiceBusReceiver receiver,
@@ -265,7 +274,7 @@ public class ServiceBusQueueManager : IQueueManager, IQueueMessageSender, IAsync
             }
 
             // Resend clones of messages
-            var clones = messages.Select(m => new ServiceBusMessage(m)).ToList();
+            var clones = messages.Select(Clone).ToList();
 
             if (clones.All(c => c.PartitionKey == clones.First().PartitionKey))
             {
