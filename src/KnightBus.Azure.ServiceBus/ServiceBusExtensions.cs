@@ -1,5 +1,7 @@
 ﻿using System;
+using KnightBus.Core.Outbox;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace KnightBus.Azure.ServiceBus;
 
@@ -23,6 +25,18 @@ public static class ServiceBusExtensions
         collection.AddSingleton<IServiceBusConfiguration>(configuration);
         collection.AddSingleton<IClientFactory, ClientFactory>();
         collection.AddScoped<IServiceBus, ServiceBus>();
+        return collection;
+    }
+
+    /// <summary>
+    /// Registers <see cref="IServiceBusOutbox"/>, which writes messages to the outbox, and the
+    /// transport the outbox dispatcher sends them with. Call <see cref="UseServiceBus(IServiceCollection, IServiceBusConfiguration)"/>
+    /// first, and register an outbox store, such as <c>UseSqlServerOutbox</c> from KnightBus.SqlServer.
+    /// </summary>
+    public static IServiceCollection UseServiceBusOutbox(this IServiceCollection collection)
+    {
+        collection.TryAddSingleton<IOutboxTransport, ServiceBusOutboxTransport>();
+        collection.TryAddScoped<IServiceBusOutbox, ServiceBusOutbox>();
         return collection;
     }
 }

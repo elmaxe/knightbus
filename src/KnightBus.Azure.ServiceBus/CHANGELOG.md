@@ -1,5 +1,14 @@
 ﻿# KnightBus.Azure.ServiceBus Changelog
 
+## 25.1.0
+### Added
+- `IServiceBusOutbox` writes commands and events to the transactional outbox instead of sending
+  them. Scheduling through it returns no sequence number, as the message gets one when dispatched
+- `ServiceBusOutboxTransport` sends outbox messages, with the outbox message id as `MessageId` so
+  duplicate detection drops a message dispatched twice
+- `services.UseServiceBusOutbox()` registers both. It needs an outbox store, such as
+  `UseSqlServerOutbox` from KnightBus.SqlServer
+
 ## 25.0.0
 ### Changed
 - Requires `KnightBus.Core` 19.0.0: the queue and topic receivers implement

@@ -120,6 +120,7 @@ nav:
       - NATS: transports/nats.md
   - Features:
       - Sagas: features/sagas.md
+      - Transactional outbox: features/outbox.md
       - Attachments: features/attachments.md
       - Scheduling: features/scheduling.md
       - Singleton processing: features/singleton-processing.md

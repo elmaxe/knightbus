@@ -3,8 +3,8 @@
     <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Description>Sql Server for KnightBus</Description>
-    <Version>17.2.0$(VersionSuffix)</Version>
-    <PackageTags>knightbus;sql;sql server;saga;</PackageTags>
+    <Version>17.3.0$(VersionSuffix)</Version>
+    <PackageTags>knightbus;sql;sql server;saga;outbox;</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" />

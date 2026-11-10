@@ -1,5 +1,14 @@
 # KnightBus.Core Changelog
 
+# 19.1.0
+* Transactional outbox building blocks in `KnightBus.Core.Outbox`, see `docs/features/outbox.md`.
+  A store package implements `IOutboxSession`, which writes messages in the caller's transaction,
+  and `IOutboxStore`, which the `OutboxDispatcher` locks, completes and retries them through. A
+  transport package implements `IOutboxTransport`. `OutboxMessageFactory` serializes and
+  pre-processes a message the way a transport does before sending it
+* Depends on `Microsoft.Extensions.Hosting.Abstractions`: the dispatcher is a hosted service, so it
+  also runs in applications that send messages without the KnightBus host
+
 # 19.0.0
 * **Breaking:** `IChannelReceiver.StartAsync(stopFetching, cancellationToken)` replaces
   `StartAsync(cancellationToken)`. Cancelling `stopFetching` stops taking new messages while the ones

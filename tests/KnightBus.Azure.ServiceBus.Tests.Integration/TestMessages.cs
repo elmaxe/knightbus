@@ -102,3 +102,23 @@ public class DrainEventSubscription : IEventSubscription<DrainEvent>
 {
     public string Name => "drain-sub";
 }
+
+public class OutboxCommand : IServiceBusCommand
+{
+    public string? Message { get; set; }
+}
+
+public class OutboxCommandMapping : IMessageMapping<OutboxCommand>
+{
+    public string QueueName => "outbox-commands";
+}
+
+public class OutboxEvent : IServiceBusEvent
+{
+    public string? Message { get; set; }
+}
+
+public class OutboxEventMapping : IMessageMapping<OutboxEvent>
+{
+    public string QueueName => "outbox-events";
+}

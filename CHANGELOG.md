@@ -1,5 +1,28 @@
 # CHANGELOG
 
+# 2026-11-10
+
+### Transactional outbox for Service Bus, stored in SQL Server
+Saving to a database and sending a message were two separate operations, so a crash or a broker
+outage between them left the database and the rest of the system disagreeing. Messages can now be
+written to an outbox table in the same transaction as the application's own data, and a dispatcher
+sends them once that transaction has committed. Delivery is at least once; the outbox message id is
+used as the Service Bus `MessageId`, so duplicate detection drops repeats. See
+[Transactional outbox](https://bookbeat.github.io/knightbus/features/outbox/).
+
+### KnightBus.Core 19.1.0
+* Added the outbox building blocks in `KnightBus.Core.Outbox`: `IOutboxSession`, `IOutboxStore`,
+  `IOutboxTransport`, `OutboxMessage`, `OutboxRecord`, `OutboxMessageFactory`, `OutboxOptions`,
+  `OutboxNotEnlistedException`, the `OutboxDispatcher` hosted service and `services.AddOutbox(...)`
+* Depends on `Microsoft.Extensions.Hosting.Abstractions`, for the dispatcher's hosted service
+### KnightBus.Azure.ServiceBus 25.1.0
+* Added `IServiceBusOutbox`, which writes messages to the outbox, and `ServiceBusOutboxTransport`,
+  which the dispatcher sends them with. Register both with `services.UseServiceBusOutbox()`
+### KnightBus.SqlServer 17.3.0
+* Added the SQL Server outbox store: `services.UseSqlServerOutbox(connectionString)` and
+  `IOutboxSession.UseSqlTransaction(transaction)`. The table is created at startup unless
+  `CreateTable` is off; `SqlServerOutboxSchema.GetCreateScript` gives the script for migrations
+
 # 2026-10-30
 
 ### New Relic transactions carry their queue, topic and subscription
